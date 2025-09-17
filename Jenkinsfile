@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        SONAR_TOKEN = credentials('sonar-token') // Add this credential in Jenkins with token value
-        DOCKERHUB_CRED = credentials('dockerhub-ramm978') // DockerHub credentials in Jenkins
+        SONAR_TOKEN = credentials('sonar-token') // SonarQube token in Jenkins
+        DOCKERHUB_CRED = credentials('dockerhub-ramm978') // DockerHub credentials
         IMAGE_NAME = "ramm978/your-sample-app"
     }
 
@@ -17,13 +17,15 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    sh """
-                    sonar-scanner \
-                    -Dsonar.projectKey=${env.BRANCH_NAME} \
-                    -Dsonar.sources=. \
-                    -Dsonar.host.url=http://3.107.198.86:9000 \
-                    -Dsonar.login=${SONAR_TOKEN}
-                    """
+                    docker.image('sonarsource/sonar-scanner-cli:latest').inside {
+                        sh """
+                        sonar-scanner \
+                        -Dsonar.projectKey=${env.BRANCH_NAME} \
+                        -Dsonar.sources=. \
+                        -Dsonar.host.url=http://3.107.198.86:9000 \
+                        -Dsonar.login=${SONAR_TOKEN}
+                        """
+                    }
                 }
             }
         }
@@ -59,3 +61,4 @@ pipeline {
         }
     }
 }
+
