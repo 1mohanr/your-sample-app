@@ -2,14 +2,13 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CRED = credentials('dockerhub-username')   // Jenkins DockerHub username credential ID
-        DOCKERHUB_CRED_PSW = credentials('dockerhub-password') // Jenkins DockerHub password credential ID
+        DOCKERHUB_CRED = credentials('dockerhub-cred-id') // Your Jenkins DockerHub credentials ID
         SONAR_TOKEN = credentials('sqa_b542c6bae4af53dd989a805d47c626ee3cdb364a') // SonarQube token
+        SONAR_HOST = "http://3.107.198.86:9000"
     }
 
     stages {
-
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
                 checkout scm
             }
@@ -18,13 +17,12 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    // Mount a writable directory for scanner cache
-                    docker.image('sonarsource/sonar-scanner-cli:latest').inside("-v ${env.WORKSPACE}/.sonar:/opt/sonar-scanner/.sonar") {
+                    docker.image('sonarsource/sonar-scanner-cli:latest').inside {
                         sh """
                         sonar-scanner \
                         -Dsonar.projectKey=${env.BRANCH_NAME} \
                         -Dsonar.sources=. \
-                        -Dsonar.host.url=http://3.107.198.86:9000 \
+                        -Dsonar.host.url=${SONAR_HOST} \
                         -Dsonar.login=${SONAR_TOKEN}
                         """
                     }
@@ -34,27 +32,22 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                script {
-                    timeout(time: 10, unit: 'MINUTES') {
-                        waitForQualityGate abortPipeline: true
-                    }
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
 
         stage('Build Artifact') {
             steps {
-                sh '''
-                # Assuming Maven project
-                mvn clean package
-                '''
+                sh 'mvn clean package -DskipTests' // Adjust if using Java/Maven project
             }
         }
 
         stage('Docker Build & Push') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-cred') {
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-cred-id') {
                         def appImage = docker.build("ramm978/your-sample-app:${env.BRANCH_NAME}")
                         appImage.push()
                     }
@@ -64,14 +57,11 @@ pipeline {
     }
 
     post {
-        always {
-            cleanWs()
-        }
         success {
-            echo 'Pipeline completed successfully!'
+            echo "Pipeline completed successfully!"
         }
         failure {
-            echo 'Pipeline failed!'
+            echo "Pipeline failed!"
         }
     }
 }
