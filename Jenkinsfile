@@ -15,20 +15,22 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    sh '''
-                        sonar-scanner \
-                        -Dsonar.projectKey=${JOB_NAME} \
-                        -Dsonar.sources=. \
-                        -Dsonar.host.url=http://3.107.198.86:9000 \
-                        -Dsonar.login=${SONAR_TOKEN}
-                    '''
+                    docker.image('sonarsource/sonar-scanner-cli:latest').inside {
+                        sh '''
+                            sonar-scanner \
+                                -Dsonar.projectKey=${JOB_NAME} \
+                                -Dsonar.sources=. \
+                                -Dsonar.host.url=http://3.107.198.86:9000 \
+                                -Dsonar.login=${SONAR_TOKEN}
+                        '''
+                    }
                 }
             }
         }
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 10, unit: 'MINUTES') {
+                timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -37,13 +39,14 @@ pipeline {
 
     post {
         always {
+            echo 'Pipeline finished!'
             cleanWs()
-        }
-        success {
-            echo 'Pipeline completed successfully!'
         }
         failure {
             echo 'Pipeline failed!'
+        }
+        success {
+            echo 'Pipeline succeeded!'
         }
     }
 }
